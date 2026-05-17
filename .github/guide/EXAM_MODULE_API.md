@@ -15,10 +15,15 @@ Module này hỗ trợ đồng thời 2 cách đưa câu hỏi vào đề:
 - câu hỏi lẻ qua `examQuestions`
 - nhóm câu hỏi qua `examQuestionGroups`
 
-Với `examQuestionGroups`, backend hiện hỗ trợ 2 mode:
+Riêng với `examQuestionGroups`, backend hiện hỗ trợ 2 mode:
 
-- dùng `question group` có sẵn từ module riêng
-- tạo mới `question group` ngay trong lúc tạo hoặc cập nhật đề
+- dùng `question group` có sẵn bằng `questionGroupUuid`
+- tạo mới `question group` ngay trong payload bằng `newQuestionGroup`
+
+Khi gắn vào đề, backend sẽ snapshot group sang:
+
+- `ExamQuestionGroup`
+- `ExamQuestionGroupItem`
 
 ---
 
@@ -187,13 +192,6 @@ Mỗi section có format:
 
 ### 4.2. Rule phần trăm chấm `TFQ`
 
-- `tfCorrect1Pct`
-- `tfCorrect2Pct`
-- `tfCorrect3Pct`
-- `tfCorrect4Pct`
-
-phải không giảm, tức là:
-
 - `tfCorrect1Pct <= tfCorrect2Pct <= tfCorrect3Pct <= tfCorrect4Pct`
 
 Nếu không truyền, backend sẽ gán mặc định:
@@ -216,8 +214,8 @@ Nếu không truyền, backend sẽ gán mặc định:
   - truyền `questionGroupUuid`
   - hoặc truyền `newQuestionGroup`
 - `pickQuestionCount` phải nhỏ hơn hoặc bằng `questionCount` của group thực tế
-- `displayOrder` là thuộc tính của đề, không phải thuộc tính của `question group` gốc
-- `scorePerQuestion` là thuộc tính của đề, không phải thuộc tính của `question group` gốc
+- `scorePerQuestion` là thuộc tính của đề, không phải thuộc tính của group gốc
+- `displayOrder` là thuộc tính của đề, không phải thuộc tính của group gốc
 
 ### 4.5. Ý nghĩa `questionCount` và `pickQuestionCount`
 
@@ -246,7 +244,7 @@ thì:
 
 ### Mô tả luồng
 
-Tạo đề mới -> validate dữ liệu chung của đề -> validate phần trăm chấm `TFQ` -> validate danh sách câu hỏi lẻ -> resolve từng phần tử `examQuestionGroups` theo mode `questionGroupUuid` hoặc `newQuestionGroup` -> nếu là `newQuestionGroup` thì tạo `question group` riêng trước -> kiểm tra toàn bộ `questionUuid` có tồn tại và đúng loại hay không -> lưu `Exam` xuống database -> snapshot group vào `ExamQuestionGroup` và `ExamQuestionGroupItem` -> build response theo cấu trúc `questionSummary` và `questionSections` -> trả kết quả
+Tạo đề mới -> validate dữ liệu chung của đề -> validate phần trăm chấm `TFQ` -> validate danh sách câu hỏi lẻ -> resolve từng phần tử `examQuestionGroups` theo mode `questionGroupUuid` hoặc `newQuestionGroup` -> nếu là `newQuestionGroup` thì tạo `question group` riêng trước -> kiểm tra toàn bộ `questionUuid` có tồn tại và đúng loại hay không -> lưu `Exam` xuống database -> lưu `ExamQuestion` -> snapshot group vào `ExamQuestionGroup` và `ExamQuestionGroupItem` -> build `questionSummary` và `questionSections` -> trả kết quả
 
 ### Input format
 
@@ -336,26 +334,14 @@ Tạo đề mới -> validate dữ liệu chung của đề -> validate phần t
     "tfCorrect3Pct": 50,
     "tfCorrect4Pct": 100,
     "questionSummary": {
-      "mcqCount": 3,
+      "mcqCount": 5,
       "tfqCount": 0,
       "saqCount": 0
     },
     "questionSections": [
       {
         "questionType": "MCQ",
-        "totalQuestionCount": 3,
-        "standaloneQuestions": [],
-        "groups": []
-      },
-      {
-        "questionType": "TFQ",
-        "totalQuestionCount": 0,
-        "standaloneQuestions": [],
-        "groups": []
-      },
-      {
-        "questionType": "SAQ",
-        "totalQuestionCount": 0,
+        "totalQuestionCount": 5,
         "standaloneQuestions": [],
         "groups": []
       }
@@ -387,7 +373,12 @@ Tạo đề mới -> validate dữ liệu chung của đề -> validate phần t
 - `Question not found with id: {questionUuid}`
 - `Exam question section type must match question type for question id: {questionUuid}`
 - `Question group not found with id: {questionGroupUuid}`
+- `Question group must contain at least one item`
+- `Question ids in a question group must be unique`
+- `Question count must match the number of group items`
 - `Pick question count must be less than or equal to pool size for group: {groupName}`
+- `Question group type must match item question type for question id: {questionUuid}`
+- `Question group topic must match item question topic for question id: {questionUuid}`
 - `Group question type must match item question type for question id: {questionUuid}`
 - `Group question topic must match item question topic for question id: {questionUuid}`
 
@@ -409,15 +400,20 @@ Tạo đề mới -> validate dữ liệu chung của đề -> validate phần t
 
 ### Mô tả luồng
 
-Nhận `examUuid` -> tìm đề theo id -> lấy danh sách câu hỏi lẻ -> lấy danh sách group -> lấy toàn bộ `Question` liên quan -> build `questionSummary` -> build `questionSections` theo `MCQ/TFQ/SAQ` -> trả kết quả
+Nhận `examUuid` -> tìm đề theo id -> lấy danh sách câu hỏi lẻ -> lấy danh sách group snapshot của đề -> lấy toàn bộ `Question` liên quan -> build `questionSummary` -> build `questionSections` theo `MCQ/TFQ/SAQ` -> trả kết quả
 
 ### Input format
-
-#### Path variable
 
 - `examUuid`: `UUID`
 
 ### Output format
+
+Backend trả `ResExamDTO`, trong đó mỗi group có cả:
+
+- `eqgUuid`: id snapshot group trong đề
+- `questionGroupUuid`: id group gốc nếu group này được tạo từ module `Question Group`
+
+Ví dụ rút gọn:
 
 ```json
 {
@@ -427,28 +423,30 @@ Nhận `examUuid` -> tìm đề theo id -> lấy danh sách câu hỏi lẻ -> l
     "examUuid": "uuid",
     "examName": "string",
     "gradeId": 12,
-    "examType": "QUIZ | HOMEWORK | MOCK_TEST | OFFICIAL_TEST",
-    "startTime": "2026-05-17T10:00:00Z | null",
-    "endTime": "2026-05-17T11:00:00Z | null",
-    "durationMinutes": 45,
-    "totalScore": 10.0,
-    "numberOfAttempt": 1,
-    "status": "DRAFT | PUBLISHED | CLOSED | ARCHIVED",
-    "createdByUserUuid": "uuid",
-    "tfCorrect1Pct": 10,
-    "tfCorrect2Pct": 25,
-    "tfCorrect3Pct": 50,
-    "tfCorrect4Pct": 100,
     "questionSummary": {
       "mcqCount": 10,
       "tfqCount": 4,
       "saqCount": 2
     },
-    "questionSections": [],
-    "createdAt": "2026-05-17T10:00:00Z",
-    "updatedAt": "2026-05-17T10:00:00Z",
-    "createdBy": "string | null",
-    "updatedBy": "string | null"
+    "questionSections": [
+      {
+        "questionType": "MCQ",
+        "totalQuestionCount": 10,
+        "standaloneQuestions": [],
+        "groups": [
+          {
+            "eqgUuid": "uuid",
+            "questionGroupUuid": "uuid",
+            "groupName": "Tích phân",
+            "poolQuestionCount": 10,
+            "pickQuestionCount": 4,
+            "scorePerQuestion": 0.5,
+            "displayOrder": 1,
+            "items": []
+          }
+        ]
+      }
+    ]
   }
 }
 ```
@@ -481,8 +479,6 @@ Nhận các tham số filter -> dựng điều kiện truy vấn động theo `g
 
 ### Input format
 
-#### Query params
-
 - `gradeId`: `Long`, không bắt buộc
 - `name`: `String`, không bắt buộc
 - `type`: `String`, không bắt buộc
@@ -491,61 +487,13 @@ Nhận các tham số filter -> dựng điều kiện truy vấn động theo `g
 - `size`: `int`, không bắt buộc
 - `sort`: `String`, không bắt buộc
 
-#### Ví dụ
+Ví dụ:
 
 `GET /api/v1/exams?gradeId=12&type=QUIZ&status=PUBLISHED&page=0&size=20&sort=createdAt,desc`
 
 ### Output format
 
-Do backend đang trả `Page<ResExamDTO>`, dữ liệu trong `data` sẽ là object phân trang của Spring, ví dụ:
-
-```json
-{
-  "statusCode": 200,
-  "message": "Get exams",
-  "data": {
-    "content": [
-      {
-        "examUuid": "uuid",
-        "examName": "string",
-        "gradeId": 12,
-        "examType": "QUIZ",
-        "startTime": "2026-05-17T10:00:00Z",
-        "endTime": "2026-05-17T11:00:00Z",
-        "durationMinutes": 45,
-        "totalScore": 10.0,
-        "numberOfAttempt": 1,
-        "status": "PUBLISHED",
-        "createdByUserUuid": "uuid",
-        "tfCorrect1Pct": 10,
-        "tfCorrect2Pct": 25,
-        "tfCorrect3Pct": 50,
-        "tfCorrect4Pct": 100,
-        "questionSummary": {
-          "mcqCount": 10,
-          "tfqCount": 4,
-          "saqCount": 2
-        },
-        "questionSections": [],
-        "createdAt": "2026-05-17T10:00:00Z",
-        "updatedAt": "2026-05-17T10:00:00Z",
-        "createdBy": "string | null",
-        "updatedBy": "string | null"
-      }
-    ],
-    "pageable": {},
-    "last": true,
-    "totalPages": 1,
-    "totalElements": 1,
-    "size": 20,
-    "number": 0,
-    "sort": {},
-    "first": true,
-    "numberOfElements": 1,
-    "empty": false
-  }
-}
-```
+Do backend đang trả `Page<ResExamDTO>`, dữ liệu trong `data` là object phân trang của Spring.
 
 ### Exception có thể trả về
 
@@ -572,53 +520,16 @@ Do backend đang trả `Page<ResExamDTO>`, dữ liệu trong `data` sẽ là obj
 
 ### Mô tả luồng
 
-Nhận `examUuid` và payload mới -> kiểm tra đề có tồn tại không -> validate toàn bộ dữ liệu giống API tạo đề -> cập nhật bản ghi `Exam` -> xóa toàn bộ `ExamQuestion` cũ -> xóa toàn bộ `ExamQuestionGroupItem` cũ -> xóa toàn bộ `ExamQuestionGroup` cũ -> tạo lại cấu trúc đề từ payload mới -> build response -> trả kết quả
+Nhận `examUuid` và payload mới -> kiểm tra đề có tồn tại không -> validate toàn bộ dữ liệu giống API tạo đề -> cập nhật bản ghi `Exam` -> xóa toàn bộ snapshot câu hỏi cũ của đề -> tạo lại snapshot mới từ payload -> build response -> trả kết quả
 
 ### Input format
 
-#### Path variable
-
 - `examUuid`: `UUID`
-
-#### Body
-
-Cấu trúc body giống `POST /api/v1/exams`
+- `body`: cùng cấu trúc với `POST /api/v1/exams`
 
 ### Output format
 
-```json
-{
-  "statusCode": 200,
-  "message": "Update exam",
-  "data": {
-    "examUuid": "uuid",
-    "examName": "string",
-    "gradeId": 12,
-    "examType": "QUIZ | HOMEWORK | MOCK_TEST | OFFICIAL_TEST",
-    "startTime": "2026-05-17T10:00:00Z | null",
-    "endTime": "2026-05-17T11:00:00Z | null",
-    "durationMinutes": 45,
-    "totalScore": 10.0,
-    "numberOfAttempt": 1,
-    "status": "DRAFT | PUBLISHED | CLOSED | ARCHIVED",
-    "createdByUserUuid": "uuid",
-    "tfCorrect1Pct": 10,
-    "tfCorrect2Pct": 25,
-    "tfCorrect3Pct": 50,
-    "tfCorrect4Pct": 100,
-    "questionSummary": {
-      "mcqCount": 10,
-      "tfqCount": 4,
-      "saqCount": 2
-    },
-    "questionSections": [],
-    "createdAt": "2026-05-17T10:00:00Z",
-    "updatedAt": "2026-05-17T10:05:00Z",
-    "createdBy": "string | null",
-    "updatedBy": "string | null"
-  }
-}
-```
+Trả `ResExamDTO` giống API tạo đề.
 
 ### Exception có thể trả về
 
@@ -649,11 +560,7 @@ Nhận `examUuid` và `status` mới -> kiểm tra đề có tồn tại không 
 
 ### Input format
 
-#### Path variable
-
 - `examUuid`: `UUID`
-
-#### Body
 
 ```json
 {
@@ -663,39 +570,7 @@ Nhận `examUuid` và `status` mới -> kiểm tra đề có tồn tại không 
 
 ### Output format
 
-```json
-{
-  "statusCode": 200,
-  "message": "Update exam status",
-  "data": {
-    "examUuid": "uuid",
-    "examName": "string",
-    "gradeId": 12,
-    "examType": "QUIZ | HOMEWORK | MOCK_TEST | OFFICIAL_TEST",
-    "startTime": "2026-05-17T10:00:00Z | null",
-    "endTime": "2026-05-17T11:00:00Z | null",
-    "durationMinutes": 45,
-    "totalScore": 10.0,
-    "numberOfAttempt": 1,
-    "status": "PUBLISHED",
-    "createdByUserUuid": "uuid",
-    "tfCorrect1Pct": 10,
-    "tfCorrect2Pct": 25,
-    "tfCorrect3Pct": 50,
-    "tfCorrect4Pct": 100,
-    "questionSummary": {
-      "mcqCount": 10,
-      "tfqCount": 4,
-      "saqCount": 2
-    },
-    "questionSections": [],
-    "createdAt": "2026-05-17T10:00:00Z",
-    "updatedAt": "2026-05-17T10:10:00Z",
-    "createdBy": "string | null",
-    "updatedBy": "string | null"
-  }
-}
-```
+Trả `ResExamDTO` giống API lấy chi tiết đề.
 
 ### Exception có thể trả về
 
@@ -718,25 +593,14 @@ Nhận `examUuid` và `status` mới -> kiểm tra đề có tồn tại không 
 
 ### 6.1. Liên quan `Question Module`
 
-Khi tạo hoặc cập nhật đề, backend có truy vấn sang dữ liệu câu hỏi để:
+Khi tạo hoặc cập nhật đề, backend truy vấn sang dữ liệu câu hỏi để:
 
 - kiểm tra `questionUuid` có tồn tại không
 - kiểm tra `sectionType` có khớp `questionType` không
-- kiểm tra topic của câu hỏi có khớp group topic không
+- kiểm tra topic của câu hỏi có khớp topic group không
 - lấy `questionContent`, `questionTopic`, `questionType` để build response chi tiết
 
-### 6.2. Liên quan `Exam Attempt Module`
-
-`Exam Module` không random câu hỏi ngay khi tạo đề.
-
-Thay vào đó:
-
-- `ExamQuestion` là câu hỏi lẻ cố định
-- `ExamQuestionGroup` là pool câu hỏi
-- `pickQuestionCount` sẽ được dùng ở `Exam Attempt Module`
-- khi học sinh bắt đầu `attempt`, hệ thống mới random câu trong từng group
-
-### 6.3. Liên quan `Question Group Module`
+### 6.2. Liên quan `Question Group Module`
 
 `Exam Module` hiện không còn coi group là dữ liệu chỉ sống bên trong đề.
 
@@ -744,13 +608,18 @@ Thay vào đó:
 
 - có thể tham chiếu group có sẵn bằng `questionGroupUuid`
 - có thể tạo mới group bằng `newQuestionGroup`
-- khi gắn vào đề, backend sẽ snapshot sang `ExamQuestionGroup` và `ExamQuestionGroupItem`
+- khi gắn vào đề, backend snapshot sang `ExamQuestionGroup` và `ExamQuestionGroupItem`
 
-Vì vậy, mọi thay đổi trong `Exam Module` sẽ ảnh hưởng trực tiếp đến:
+### 6.3. Liên quan `Exam Attempt Module`
 
-- số lượng câu hỏi mỗi loại mà học sinh nhìn thấy
-- cấu trúc group khi random đề
-- cách chấm điểm từng câu lấy từ group
+`Exam Module` không random câu hỏi ngay khi tạo đề.
+
+Thay vào đó:
+
+- `ExamQuestion` là câu hỏi lẻ cố định
+- `ExamQuestionGroup` là pool câu hỏi của đề
+- `pickQuestionCount` sẽ được dùng ở `Exam Attempt Module`
+- khi học sinh bắt đầu `attempt`, hệ thống mới random câu trong từng group
 
 ---
 
@@ -803,7 +672,8 @@ Một loại như `MCQ` có thể có nhiều group khác nhau, ví dụ:
 ### 8.1. Tạo đề cơ bản
 
 - tạo đề chỉ có câu hỏi lẻ
-- tạo đề chỉ có group
+- tạo đề chỉ dùng group có sẵn
+- tạo đề chỉ dùng `newQuestionGroup`
 - tạo đề có cả câu hỏi lẻ và group
 
 ### 8.2. Kiểm thử validation
@@ -811,6 +681,8 @@ Một loại như `MCQ` có thể có nhiều group khác nhau, ví dụ:
 - `endTime` nhỏ hơn `startTime`
 - `questionOrder` bị trùng
 - `displayOrder` bị trùng
+- cùng lúc truyền cả `questionGroupUuid` và `newQuestionGroup`
+- không truyền cả `questionGroupUuid` lẫn `newQuestionGroup`
 - `pickQuestionCount > questionCount`
 - question trong group sai `questionType`
 - question trong group sai `questionTopic`
@@ -828,4 +700,5 @@ Một loại như `MCQ` có thể có nhiều group khác nhau, ví dụ:
 - kiểm tra `questionSections`
 - kiểm tra `standaloneQuestions`
 - kiểm tra `groups`
+- kiểm tra `questionGroupUuid`
 - kiểm tra `poolQuestionCount` và `pickQuestionCount`
