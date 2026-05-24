@@ -177,6 +177,59 @@ public class ExamAttemptService {
     }
 
     @Transactional
+    public ResExamAttemptDTO importOmrAttempt(
+            UUID examUuid,
+            UUID studentUuid,
+            String questionSnapshotJson,
+            Map<Integer, String> rawAnswerByQuestionOrder) {
+        Exam exam = findExamById(examUuid);
+        List<AttemptQuestionSnapshot> snapshots = deserializeSnapshots(questionSnapshotJson);
+        Set<Integer> validQuestionOrders = snapshots.stream()
+                .map(AttemptQuestionSnapshot::questionOrder)
+                .collect(Collectors.toSet());
+
+        for (Integer questionOrder : rawAnswerByQuestionOrder.keySet()) {
+            if (!validQuestionOrders.contains(questionOrder)) {
+                throw new IdInvalidException("Question order does not belong to this paper: " + questionOrder);
+            }
+        }
+
+        int nextAttemptNo = examAttemptRepository.findTopByExamUuidAndStudentUuidOrderByAttemptNoDesc(examUuid, studentUuid)
+                .map(existing -> existing.getAttemptNo() + 1)
+                .orElse(1);
+
+        ExamAttempt attempt = new ExamAttempt();
+        attempt.setExamUuid(examUuid);
+        attempt.setStudentUuid(studentUuid);
+        attempt.setAttemptNo(nextAttemptNo);
+        attempt.setStartedAt(Instant.now());
+        attempt.setStatus(AttemptStatus.IN_PROGRESS);
+        attempt.setIsAutoSubmitted(false);
+        attempt.setSubmitSource(SubmitSource.OMR_IMPORT);
+        attempt.setQuestionSnapshotJson(questionSnapshotJson);
+
+        ExamAttempt savedAttempt = examAttemptRepository.save(attempt);
+        List<StudentAnswer> answers = snapshots.stream()
+                .filter(snapshot -> rawAnswerByQuestionOrder.containsKey(snapshot.questionOrder()))
+                .map(snapshot -> {
+                    String rawAnswer = rawAnswerByQuestionOrder.get(snapshot.questionOrder());
+                    StudentAnswer studentAnswer = new StudentAnswer();
+                    studentAnswer.setAttemptUuid(savedAttempt.getAttemptUuid());
+                    studentAnswer.setQuestionUuid(snapshot.questionUuid());
+                    studentAnswer.setRawAnswer(rawAnswer);
+                    studentAnswer.setNormalizedAnswer(normalizeStudentAnswer(snapshot.questionType(), rawAnswer));
+                    studentAnswer.setQuestionAttemptNumber(1);
+                    studentAnswer.setIsFinalAnswer(false);
+                    return studentAnswer;
+                })
+                .toList();
+        studentAnswerRepository.saveAll(answers);
+
+        ExamAttempt scoredAttempt = finalizeAttempt(savedAttempt, exam, false);
+        return buildAttemptResponse(scoredAttempt, exam);
+    }
+
+    @Transactional
     @Scheduled(fixedDelayString = "${examservice.attempt.auto-submit.fixed-delay-ms:30000}")
     public void autoSubmitExpiredAttempts() {
         List<ExamAttempt> inProgressAttempts = examAttemptRepository.findByStatusOrderByStartedAtAsc(AttemptStatus.IN_PROGRESS);

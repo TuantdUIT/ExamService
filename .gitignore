@@ -1,12 +1,20 @@
 HELP.md
 .gradle
 .gradle-user-home/
+.gradle-user-home-*/
+.github/java-upgrade/
 build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
 *.log
 logs/
+hs_err_pid*
+replay_pid*
+*.hprof
+target/
+coverage/
+.nyc_output/
 
 ### STS ###
 .apt_generated

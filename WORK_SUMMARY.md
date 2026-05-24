@@ -217,7 +217,34 @@ Các file liên quan:
 
 ---
 
-## 9. Chấm điểm
+## 9. Module OMR
+
+### API đã có
+
+- `POST /api/v1/omr/exam-papers`
+- `POST /api/v1/omr/imports`
+
+### Chức năng đã làm
+
+- tạo `ExamPaper` để lưu mã đề và snapshot câu hỏi của bản in
+- random câu hỏi trong group tại thời điểm tạo `ExamPaper`
+- import dữ liệu OMR từ `ScoringService` mà không cần attempt có sẵn
+- tự tạo `ExamAttempt` với `submitSource = OMR_IMPORT`
+- map `questionOrder` từ bản scan sang `questionUuid` dựa trên snapshot của `ExamPaper`
+- lưu đáp án vào `StudentAnswer`
+- chấm điểm bằng cùng rule của `ExamAttemptService`
+- lưu log `OmrImport` để audit/debug payload scan
+
+### File chính
+
+- [OmrController.java](D:/DoAn/DoAn1/ExamService/ExamService/src/main/java/com/DoAn1/examservice/controller/OmrController.java)
+- [OmrService.java](D:/DoAn/DoAn1/ExamService/ExamService/src/main/java/com/DoAn1/examservice/service/OmrService.java)
+- [ExamPaper.java](D:/DoAn/DoAn1/ExamService/ExamService/src/main/java/com/DoAn1/examservice/domain/entity/ExamPaper.java)
+- [OmrImport.java](D:/DoAn/DoAn1/ExamService/ExamService/src/main/java/com/DoAn1/examservice/domain/entity/OmrImport.java)
+
+---
+
+## 10. Chấm điểm
 
 ### MCQ
 
@@ -264,7 +291,7 @@ Các file liên quan:
 
 ---
 
-## 10. Auto-submit
+## 11. Auto-submit
 
 Đã làm auto-submit theo 2 lớp:
 
@@ -293,7 +320,7 @@ File liên quan:
 
 ---
 
-## 11. Tối ưu và convention đã áp dụng
+## 12. Tối ưu và convention đã áp dụng
 
 - dùng service class trực tiếp, không dùng `impl`
 - `@PathVariable(name = "...")`
@@ -303,7 +330,7 @@ File liên quan:
 
 ---
 
-## 12. Trạng thái kiểm chứng
+## 13. Trạng thái kiểm chứng
 
 Sau các mốc triển khai chính, mình đã chạy:
 
@@ -317,7 +344,7 @@ Kết quả ở các lần kiểm tra gần nhất:
 
 ---
 
-## 13. Các phần chưa làm hoặc mới ở mức nền
+## 14. Các phần chưa làm hoặc mới ở mức nền
 
 - `ExamAssignment` với rule nghiệp vụ đầy đủ
 - chỉ học sinh được assign mới được làm bài
@@ -327,11 +354,11 @@ Kết quả ở các lần kiểm tra gần nhất:
 - test unit và integration chuyên sâu cho từng module
 - websocket realtime
 - fuzzy grading cho `SAQ`
-- API import hoàn chỉnh cho luồng `OMR_IMPORT`
+- API xem lại lịch sử import OMR
 
 ---
 
-## 14. Kết luận hiện tại
+## 15. Kết luận hiện tại
 
 Tính đến thời điểm này:
 

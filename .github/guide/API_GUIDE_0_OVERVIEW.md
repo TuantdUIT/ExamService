@@ -84,7 +84,19 @@ Theo yêu cầu hiện tại:
 - Trạng thái:
   - đã có API
 
-### 2.7. Scoring Rules
+### 2.7. OMR Module
+
+- Mục đích:
+  - tạo mã đề / bản in đề
+  - nhận dữ liệu OMR từ `ScoringService`
+  - tự tạo attempt dạng `OMR_IMPORT`
+  - lưu đáp án và chấm điểm bài giấy
+- File guide chi tiết:
+  - [.github/guide/OMR_MODULE_API.md](D:/DoAn/DoAn1/ExamService/ExamService/.github/guide/OMR_MODULE_API.md)
+- Trạng thái:
+  - đã có API
+
+### 2.8. Scoring Rules
 
 - Mục đích:
   - mô tả riêng nghiệp vụ chấm điểm
@@ -106,7 +118,8 @@ Nếu viết tiếp theo mức độ ưu tiên cho frontend, mình đề xuất:
 4. `Exam Attempt Module`
 5. `Exam Assignment Module`
 6. `System / Health Module`
-7. `Scoring Rules`
+7. `OMR Module`
+8. `Scoring Rules`
 
 ---
 
