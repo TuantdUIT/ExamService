@@ -1,12 +1,10 @@
 package com.DoAn1.examservice.domain.requestDTO.omr;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
@@ -29,6 +27,6 @@ public class ReqOmrImportDTO {
     private Instant scannedAt;
 
     @Valid
-    @NotEmpty(message = "Answers are required")
-    private List<ReqOmrAnswerDTO> answers;
+    @NotNull(message = "Sections are required")
+    private ReqOmrSectionsDTO sections;
 }

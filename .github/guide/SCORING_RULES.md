@@ -184,22 +184,26 @@ Ví dụ:
 - học sinh chọn: `B`
 - kết quả: sai
 
-### 5.4. Ký tự `M`
+### 5.4. Học sinh tô nhiều hơn 1 lựa chọn
 
-Trong luồng `OMR_IMPORT`, nếu học sinh tô nhiều hơn `1` lựa chọn cho cùng một câu `MCQ`, backend có thể biểu diễn đáp án chuẩn hóa bằng:
+Trong luồng `OMR_IMPORT`, nếu học sinh tô nhiều hơn `1` lựa chọn cho cùng một câu `MCQ`, `rawAnswer` nên gửi nguyên các lựa chọn đã tô.
 
-- `M`
+Ví dụ:
+
+- học sinh tô `A` và `D`
+- `rawAnswer = "AD"`
+- backend normalize thành `AD`
 
 Rule hiện tại:
 
-- nếu `studentAnswer = M`
+- nếu `studentAnswer` sau normalize có độ dài khác `1`
 - câu đó bị tính `0` điểm
 
 ### 5.5. Tóm tắt `MCQ`
 
 - `WEB`: đúng nếu chọn đúng `1` đáp án và đáp án đó nằm trong đáp án chuẩn
 - `OMR_IMPORT`: đúng nếu chọn đúng `1` đáp án và bằng chính xác đáp án chuẩn
-- có `M` -> sai
+- chọn nhiều đáp án như `AD` -> sai
 
 ---
 
@@ -386,7 +390,7 @@ Backend hiện chưa hỗ trợ:
 
 - `WEB` với 1 đáp án đúng
 - `WEB` với nhiều đáp án đúng
-- `OMR_IMPORT` với tô nhiều đáp án
+- `OMR_IMPORT` với tô nhiều đáp án, ví dụ `AD`
 - `OMR_IMPORT` với đáp án đúng 1 ký tự
 
 ### 10.2. `TFQ`

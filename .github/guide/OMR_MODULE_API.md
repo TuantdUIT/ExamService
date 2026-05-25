@@ -56,6 +56,7 @@ Nhận `examUuid` và `paperCode` -> kiểm tra đề tồn tại -> kiểm tra 
     "questions": [
       {
         "questionOrder": 1,
+        "sectionQuestionNumber": 1,
         "questionUuid": "uuid",
         "questionType": "MCQ",
         "score": 0.25,
@@ -88,7 +89,7 @@ Nhận `examUuid` và `paperCode` -> kiểm tra đề tồn tại -> kiểm tra 
 
 ### Mô tả luồng
 
-Nhận dữ liệu OMR từ `ScoringService` -> tìm `ExamPaper` theo `examUuid + paperCode` -> kiểm tra `externalSubmissionId` nếu có để chống import trùng -> map từng `questionOrder` về `questionUuid` trong snapshot của mã đề -> tạo `ExamAttempt` với `submitSource = OMR_IMPORT` -> lưu đáp án vào `StudentAnswer` -> tạo final answer -> chấm điểm -> lưu log `OmrImport` -> trả kết quả import.
+Nhận dữ liệu OMR từ `ScoringService` -> tìm `ExamPaper` theo `examUuid + paperCode` -> kiểm tra `externalSubmissionId` nếu có để chống import trùng -> map từng `sectionQuestionNumber` trong từng section về `questionUuid` trong snapshot của mã đề -> tạo `ExamAttempt` với `submitSource = OMR_IMPORT` -> lưu đáp án vào `StudentAnswer` -> tạo final answer -> chấm điểm -> lưu log `OmrImport` -> trả kết quả import.
 
 ### Input format
 
@@ -99,20 +100,30 @@ Nhận dữ liệu OMR từ `ScoringService` -> tìm `ExamPaper` theo `examUuid 
   "studentUuid": "018f4a61-22cd-7b11-9fd2-7c5d5b5b0002",
   "externalSubmissionId": "scoring-service-omr-0001",
   "scannedAt": "2026-05-25T10:05:00Z",
-  "answers": [
-    {
-      "questionOrder": 1,
-      "rawAnswer": "A"
-    },
-    {
-      "questionOrder": 2,
-      "rawAnswer": "DSBD"
-    },
-    {
-      "questionOrder": 3,
-      "rawAnswer": "|23|,|7"
-    }
-  ]
+  "sections": {
+    "mcq": [
+      {
+        "sectionQuestionNumber": 1,
+        "rawAnswer": "A"
+      },
+      {
+        "sectionQuestionNumber": 2,
+        "rawAnswer": "AD"
+      }
+    ],
+    "tfq": [
+      {
+        "sectionQuestionNumber": 1,
+        "rawAnswer": "DSBD"
+      }
+    ],
+    "saq": [
+      {
+        "sectionQuestionNumber": 1,
+        "rawAnswer": "|23|,|7"
+      }
+    ]
+  }
 }
 ```
 
@@ -142,23 +153,78 @@ Nhận dữ liệu OMR từ `ScoringService` -> tìm `ExamPaper` theo `examUuid 
 - `Exam id is required`
 - `Paper code must not be blank`
 - `Student id is required`
-- `Answers are required`
-- `Question order is required`
+- `Sections are required`
+- `OMR sections must contain at least one answer`
+- `Section question number is required`
 - `Exam paper not found with code: {paperCode}`
 - `OMR submission already imported: {externalSubmissionId}`
-- `Question order must be unique in OMR answers: {questionOrder}`
-- `Question order does not belong to this paper: {questionOrder}`
+- `Section question number must be unique in OMR section {questionType}: {sectionQuestionNumber}`
+- `Section question number does not belong to OMR section {questionType}: {sectionQuestionNumber}`
 - `Failed to serialize OMR import payload`
 - các lỗi chấm bài kế thừa từ `ExamAttemptService`
 
 ---
 
-## 5. Quy ước rawAnswer
+## 5. Quy ước sections
+
+`sections` chia dữ liệu OMR thành 3 phần đúng với layout phiếu:
+
+- `mcq`: danh sách đáp án trắc nghiệm
+- `tfq`: danh sách đáp án đúng/sai
+- `saq`: danh sách đáp án ngắn
+
+Mỗi section dùng `sectionQuestionNumber` riêng, bắt đầu từ `1`.
+
+Ví dụ:
+
+- `sections.mcq[0].sectionQuestionNumber = 1` nghĩa là câu MCQ số 1 trên phiếu
+- `sections.tfq[0].sectionQuestionNumber = 1` nghĩa là câu TFQ số 1 trên phiếu
+- `sections.saq[0].sectionQuestionNumber = 1` nghĩa là câu SAQ số 1 trên phiếu
+
+Backend sẽ map theo cặp:
+
+```text
+questionType + sectionQuestionNumber -> questionOrder nội bộ của ExamPaper -> questionUuid
+```
+
+`questionOrder` vẫn tồn tại trong `ExamPaper` để backend lưu snapshot theo thứ tự toàn cục, nhưng `ScoringService` không cần gửi `questionOrder` khi import OMR.
+
+Ví dụ:
+
+```json
+{
+  "sections": {
+    "mcq": [
+      {
+        "sectionQuestionNumber": 1,
+        "rawAnswer": "AD"
+      }
+    ],
+    "tfq": [
+      {
+        "sectionQuestionNumber": 1,
+        "rawAnswer": "DSBD"
+      }
+    ],
+    "saq": [
+      {
+        "sectionQuestionNumber": 1,
+        "rawAnswer": "|23|,|7"
+      }
+    ]
+  }
+}
+```
+
+---
+
+## 6. Quy ước rawAnswer
 
 ### MCQ
 
 - `A`, `B`, `C`, `D`: học sinh tô đúng 1 lựa chọn
-- `M`: học sinh tô nhiều hơn 1 lựa chọn
+- nếu học sinh tô nhiều hơn 1 lựa chọn, gửi nguyên các lựa chọn đã tô
+- ví dụ học sinh tô `A` và `D` thì gửi `AD`
 - `null` hoặc rỗng: bỏ trống
 
 ### TFQ
@@ -172,7 +238,7 @@ Ví dụ:
 
 ```json
 {
-  "questionOrder": 2,
+  "sectionQuestionNumber": 2,
   "rawAnswer": "DSBD"
 }
 ```
@@ -197,10 +263,10 @@ Nếu `normalizedAnswer` có `M`, câu `SAQ` thực tế sẽ không khớp đá
 
 ---
 
-## 6. Ghi chú nghiệp vụ
+## 7. Ghi chú nghiệp vụ
 
 - OMR không dùng `POST /api/v1/student/exams/{examUuid}/attempts`
 - `attemptUuid` được `ExamService` tự tạo trong lúc import OMR
-- `ExamPaper` là snapshot bản in, giúp `questionOrder` trên giấy map chính xác về `questionUuid`
+- `ExamPaper` là snapshot bản in, giúp `sectionQuestionNumber` trong từng section map chính xác về `questionUuid`
 - nếu đề có group random, random xảy ra khi tạo `ExamPaper`, không xảy ra khi import OMR
 - `OmrImport` lưu lại payload scan và attempt được tạo để phục vụ audit/debug

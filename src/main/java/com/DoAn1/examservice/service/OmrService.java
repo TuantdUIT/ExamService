@@ -25,6 +25,7 @@ import com.DoAn1.examservice.domain.enums.QuestionType;
 import com.DoAn1.examservice.domain.requestDTO.omr.ReqCreateExamPaperDTO;
 import com.DoAn1.examservice.domain.requestDTO.omr.ReqOmrAnswerDTO;
 import com.DoAn1.examservice.domain.requestDTO.omr.ReqOmrImportDTO;
+import com.DoAn1.examservice.domain.requestDTO.omr.ReqOmrSectionsDTO;
 import com.DoAn1.examservice.domain.responseDTO.attempt.ResExamAttemptDTO;
 import com.DoAn1.examservice.domain.responseDTO.omr.ResExamPaperDTO;
 import com.DoAn1.examservice.domain.responseDTO.omr.ResExamPaperQuestionDTO;
@@ -89,7 +90,8 @@ public class OmrService {
         ExamPaper paper = examPaperRepository.findByExamUuidAndPaperCode(request.getExamUuid(), paperCode)
                 .orElseThrow(() -> new IdInvalidException("Exam paper not found with code: " + paperCode));
 
-        Map<Integer, String> rawAnswerByQuestionOrder = buildRawAnswerMap(request.getAnswers());
+        List<PaperQuestionSnapshot> snapshots = deserializeSnapshots(paper.getQuestionSnapshotJson());
+        Map<Integer, String> rawAnswerByQuestionOrder = buildRawAnswerMap(request.getSections(), snapshots);
         ResExamAttemptDTO attempt = examAttemptService.importOmrAttempt(
                 request.getExamUuid(),
                 request.getStudentUuid(),
@@ -119,13 +121,19 @@ public class OmrService {
     private List<PaperQuestionSnapshot> buildPaperQuestionSnapshots(UUID examUuid) {
         List<PaperQuestionSnapshot> snapshots = new ArrayList<>();
         int nextOrder = 1;
+        Map<QuestionType, Integer> nextSectionNumberByType = new LinkedHashMap<>();
+        for (QuestionType questionType : QuestionType.values()) {
+            nextSectionNumberByType.put(questionType, 1);
+        }
 
         List<ExamQuestion> standaloneQuestions = examQuestionRepository.findByExamUuidOrderByQuestionOrderAsc(examUuid);
         for (ExamQuestion examQuestion : standaloneQuestions) {
+            QuestionType questionType = examQuestion.getSectionType();
             snapshots.add(new PaperQuestionSnapshot(
                     nextOrder++,
+                    nextSectionNumberByType.compute(questionType, (key, value) -> value + 1) - 1,
                     examQuestion.getQuestionUuid(),
-                    examQuestion.getSectionType(),
+                    questionType,
                     examQuestion.getScore(),
                     false,
                     null,
@@ -140,10 +148,12 @@ public class OmrService {
                     .toList();
 
             for (ExamQuestionGroupItem item : pickedItems) {
+                QuestionType questionType = group.getQuestionType();
                 snapshots.add(new PaperQuestionSnapshot(
                         nextOrder++,
+                        nextSectionNumberByType.compute(questionType, (key, value) -> value + 1) - 1,
                         item.getQuestionUuid(),
-                        group.getQuestionType(),
+                        questionType,
                         group.getScorePerQuestion(),
                         true,
                         group.getEqgUuid(),
@@ -154,15 +164,46 @@ public class OmrService {
         return snapshots;
     }
 
-    private Map<Integer, String> buildRawAnswerMap(List<ReqOmrAnswerDTO> answers) {
+    private Map<Integer, String> buildRawAnswerMap(
+            ReqOmrSectionsDTO sections,
+            List<PaperQuestionSnapshot> snapshots) {
+        Map<QuestionType, Map<Integer, PaperQuestionSnapshot>> snapshotBySectionNumber = snapshots.stream()
+                .collect(Collectors.groupingBy(
+                        PaperQuestionSnapshot::questionType,
+                        Collectors.toMap(PaperQuestionSnapshot::sectionQuestionNumber, snapshot -> snapshot)));
         Map<Integer, String> rawAnswerByQuestionOrder = new LinkedHashMap<>();
-        for (ReqOmrAnswerDTO answer : answers) {
-            if (rawAnswerByQuestionOrder.containsKey(answer.getQuestionOrder())) {
-                throw new IdInvalidException("Question order must be unique in OMR answers: " + answer.getQuestionOrder());
-            }
-            rawAnswerByQuestionOrder.put(answer.getQuestionOrder(), answer.getRawAnswer());
+        addSectionAnswers(rawAnswerByQuestionOrder, snapshotBySectionNumber, QuestionType.MCQ, safeAnswers(sections.getMcq()));
+        addSectionAnswers(rawAnswerByQuestionOrder, snapshotBySectionNumber, QuestionType.TFQ, safeAnswers(sections.getTfq()));
+        addSectionAnswers(rawAnswerByQuestionOrder, snapshotBySectionNumber, QuestionType.SAQ, safeAnswers(sections.getSaq()));
+
+        if (rawAnswerByQuestionOrder.isEmpty()) {
+            throw new IdInvalidException("OMR sections must contain at least one answer");
         }
         return rawAnswerByQuestionOrder;
+    }
+
+    private void addSectionAnswers(
+            Map<Integer, String> rawAnswerByQuestionOrder,
+            Map<QuestionType, Map<Integer, PaperQuestionSnapshot>> snapshotBySectionNumber,
+            QuestionType expectedQuestionType,
+            List<ReqOmrAnswerDTO> answers) {
+        Map<Integer, PaperQuestionSnapshot> snapshotByNumber = snapshotBySectionNumber.getOrDefault(expectedQuestionType, Map.of());
+        for (ReqOmrAnswerDTO answer : answers) {
+            PaperQuestionSnapshot snapshot = snapshotByNumber.get(answer.getSectionQuestionNumber());
+            if (snapshot == null) {
+                throw new IdInvalidException("Section question number does not belong to OMR section "
+                        + expectedQuestionType + ": " + answer.getSectionQuestionNumber());
+            }
+            if (rawAnswerByQuestionOrder.containsKey(snapshot.questionOrder())) {
+                throw new IdInvalidException("Section question number must be unique in OMR section "
+                        + expectedQuestionType + ": " + answer.getSectionQuestionNumber());
+            }
+            rawAnswerByQuestionOrder.put(snapshot.questionOrder(), answer.getRawAnswer());
+        }
+    }
+
+    private List<ReqOmrAnswerDTO> safeAnswers(List<ReqOmrAnswerDTO> answers) {
+        return answers == null ? List.of() : answers;
     }
 
     private ResExamPaperDTO buildPaperResponse(ExamPaper paper, List<PaperQuestionSnapshot> snapshots) {
@@ -176,6 +217,7 @@ public class OmrService {
                         .sorted(Comparator.comparing(PaperQuestionSnapshot::questionOrder))
                         .map(snapshot -> ResExamPaperQuestionDTO.builder()
                                 .questionOrder(snapshot.questionOrder())
+                                .sectionQuestionNumber(snapshot.sectionQuestionNumber())
                                 .questionUuid(snapshot.questionUuid())
                                 .questionType(snapshot.questionType())
                                 .score(snapshot.score())
@@ -210,6 +252,15 @@ public class OmrService {
         }
     }
 
+    private List<PaperQuestionSnapshot> deserializeSnapshots(String snapshotJson) {
+        try {
+            return objectMapper.readValue(snapshotJson, new TypeReference<List<PaperQuestionSnapshot>>() {
+            });
+        } catch (JsonProcessingException ex) {
+            throw new IdInvalidException("Failed to read exam paper question snapshot", ex);
+        }
+    }
+
     private String serializePayload(ReqOmrImportDTO request) {
         try {
             return objectMapper.writeValueAsString(request);
@@ -234,6 +285,7 @@ public class OmrService {
 
     private record PaperQuestionSnapshot(
             Integer questionOrder,
+            Integer sectionQuestionNumber,
             UUID questionUuid,
             QuestionType questionType,
             BigDecimal score,

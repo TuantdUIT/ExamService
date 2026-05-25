@@ -230,7 +230,9 @@ Các file liên quan:
 - random câu hỏi trong group tại thời điểm tạo `ExamPaper`
 - import dữ liệu OMR từ `ScoringService` mà không cần attempt có sẵn
 - tự tạo `ExamAttempt` với `submitSource = OMR_IMPORT`
-- map `questionOrder` từ bản scan sang `questionUuid` dựa trên snapshot của `ExamPaper`
+- map `sectionQuestionNumber` trong từng section từ bản scan sang `questionUuid` dựa trên snapshot của `ExamPaper`
+- input import OMR được chia theo `sections.mcq`, `sections.tfq`, `sections.saq`
+- mỗi section dùng `sectionQuestionNumber` riêng, không dùng `questionOrder` global từ ScoringService
 - lưu đáp án vào `StudentAnswer`
 - chấm điểm bằng cùng rule của `ExamAttemptService`
 - lưu log `OmrImport` để audit/debug payload scan
@@ -250,7 +252,7 @@ Các file liên quan:
 
 - với luồng `WEB`, nếu đáp án chuẩn vô tình chứa nhiều phương án đúng như `AD`, học sinh chọn `A` hoặc `D` vẫn được tính đúng
 - với luồng `OMR_IMPORT`, học sinh phải có đúng 1 lựa chọn hợp lệ mới được xét đúng
-- với luồng `OMR_IMPORT`, nếu học sinh tô nhiều hơn 1 đáp án cho cùng một câu, hệ thống có thể biểu diễn bằng ký tự `M` và tính câu đó là sai
+- với luồng `OMR_IMPORT`, nếu học sinh tô nhiều hơn 1 đáp án cho cùng một câu thì gửi nguyên các lựa chọn đã tô, ví dụ `AD`, và tính câu đó là sai
 
 ### TFQ
 

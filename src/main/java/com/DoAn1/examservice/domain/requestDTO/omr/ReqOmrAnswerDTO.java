@@ -8,8 +8,8 @@ import lombok.Setter;
 @Setter
 public class ReqOmrAnswerDTO {
 
-    @NotNull(message = "Question order is required")
-    private Integer questionOrder;
+    @NotNull(message = "Section question number is required")
+    private Integer sectionQuestionNumber;
 
     private String rawAnswer;
 }

@@ -14,6 +14,7 @@ import lombok.Setter;
 @Builder
 public class ResExamPaperQuestionDTO {
     private Integer questionOrder;
+    private Integer sectionQuestionNumber;
     private UUID questionUuid;
     private QuestionType questionType;
     private BigDecimal score;

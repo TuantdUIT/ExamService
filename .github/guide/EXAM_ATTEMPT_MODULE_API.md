@@ -186,7 +186,7 @@ Nếu `exam.endTime` là `null`, hệ thống dùng:
 
 - backend normalize về chuỗi option key, ví dụ `A`, `B`, `AD`
 - với `WEB`, nếu đáp án chuẩn là `AD` thì học sinh chọn `A` hoặc `D` vẫn được tính đúng
-- với `OMR_IMPORT`, nếu học sinh tô nhiều hơn 1 đáp án thì có thể biểu diễn bằng `M` và bị tính sai
+- với `OMR_IMPORT`, nếu học sinh tô nhiều hơn 1 đáp án thì gửi nguyên các lựa chọn đã tô, ví dụ `AD`, và câu đó bị tính sai
 
 #### TFQ
 
