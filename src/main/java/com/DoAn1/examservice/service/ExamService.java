@@ -280,6 +280,9 @@ public class ExamService {
         groupIds.forEach(examQuestionGroupItemRepository::deleteByEqgUuid);
         examQuestionGroupRepository.deleteByExamUuid(examUuid);
         examQuestionRepository.deleteByExamUuid(examUuid);
+        examQuestionGroupItemRepository.flush();
+        examQuestionGroupRepository.flush();
+        examQuestionRepository.flush();
 
         if (request.getExamQuestions() != null && !request.getExamQuestions().isEmpty()) {
             List<ExamQuestion> examQuestions = request.getExamQuestions().stream()
