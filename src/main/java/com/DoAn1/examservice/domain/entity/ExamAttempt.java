@@ -65,6 +65,12 @@ public class ExamAttempt {
     @Column(nullable = false, length = 20)
     private SubmitSource submitSource;
 
+    @Column(length = 1000)
+    private String rawImageUrl;
+
+    @Column(length = 1000)
+    private String scoredImageUrl;
+
     @Column(nullable = false, columnDefinition = "TEXT")
     private String questionSnapshotJson;
 

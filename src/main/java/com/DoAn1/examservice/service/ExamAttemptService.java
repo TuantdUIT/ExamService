@@ -181,7 +181,9 @@ public class ExamAttemptService {
             UUID examUuid,
             UUID studentUuid,
             String questionSnapshotJson,
-            Map<Integer, String> rawAnswerByQuestionOrder) {
+            Map<Integer, String> rawAnswerByQuestionOrder,
+            String rawImageUrl,
+            String scoredImageUrl) {
         Exam exam = findExamById(examUuid);
         List<AttemptQuestionSnapshot> snapshots = deserializeSnapshots(questionSnapshotJson);
         Set<Integer> validQuestionOrders = snapshots.stream()
@@ -206,6 +208,8 @@ public class ExamAttemptService {
         attempt.setStatus(AttemptStatus.IN_PROGRESS);
         attempt.setIsAutoSubmitted(false);
         attempt.setSubmitSource(SubmitSource.OMR_IMPORT);
+        attempt.setRawImageUrl(rawImageUrl);
+        attempt.setScoredImageUrl(scoredImageUrl);
         attempt.setQuestionSnapshotJson(questionSnapshotJson);
 
         ExamAttempt savedAttempt = examAttemptRepository.save(attempt);
@@ -375,6 +379,8 @@ public class ExamAttemptService {
                 .status(attempt.getStatus())
                 .score(attempt.getScore())
                 .isAutoSubmitted(attempt.getIsAutoSubmitted())
+                .rawImageUrl(attempt.getRawImageUrl())
+                .scoredImageUrl(attempt.getScoredImageUrl())
                 .questions(questions)
                 .build();
     }
@@ -391,6 +397,8 @@ public class ExamAttemptService {
                 .status(attempt.getStatus())
                 .score(attempt.getScore())
                 .isAutoSubmitted(attempt.getIsAutoSubmitted())
+                .rawImageUrl(attempt.getRawImageUrl())
+                .scoredImageUrl(attempt.getScoredImageUrl())
                 .build();
     }
 

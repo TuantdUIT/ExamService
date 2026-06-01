@@ -24,6 +24,10 @@ public class ReqOmrImportDTO {
 
     private String externalSubmissionId;
 
+    private String rawImageUrl;
+
+    private String scoredImageUrl;
+
     private Instant scannedAt;
 
     @Valid

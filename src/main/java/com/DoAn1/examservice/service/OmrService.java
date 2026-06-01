@@ -96,7 +96,9 @@ public class OmrService {
                 request.getExamUuid(),
                 request.getStudentUuid(),
                 paper.getQuestionSnapshotJson(),
-                rawAnswerByQuestionOrder);
+                rawAnswerByQuestionOrder,
+                request.getRawImageUrl(),
+                request.getScoredImageUrl());
 
         OmrImport omrImport = new OmrImport();
         omrImport.setExamUuid(request.getExamUuid());
@@ -191,8 +193,7 @@ public class OmrService {
         for (ReqOmrAnswerDTO answer : answers) {
             PaperQuestionSnapshot snapshot = snapshotByNumber.get(answer.getSectionQuestionNumber());
             if (snapshot == null) {
-                throw new IdInvalidException("Section question number does not belong to OMR section "
-                        + expectedQuestionType + ": " + answer.getSectionQuestionNumber());
+                continue;
             }
             if (rawAnswerByQuestionOrder.containsKey(snapshot.questionOrder())) {
                 throw new IdInvalidException("Section question number must be unique in OMR section "

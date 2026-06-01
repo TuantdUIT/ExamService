@@ -230,9 +230,11 @@ Các file liên quan:
 - random câu hỏi trong group tại thời điểm tạo `ExamPaper`
 - import dữ liệu OMR từ `ScoringService` mà không cần attempt có sẵn
 - tự tạo `ExamAttempt` với `submitSource = OMR_IMPORT`
+- lưu `rawImageUrl` và `scoredImageUrl` từ `ScoringService` vào `ExamAttempt`
 - map `sectionQuestionNumber` trong từng section từ bản scan sang `questionUuid` dựa trên snapshot của `ExamPaper`
 - input import OMR được chia theo `sections.mcq`, `sections.tfq`, `sections.saq`
 - mỗi section dùng `sectionQuestionNumber` riêng, không dùng `questionOrder` global từ ScoringService
+- bỏ qua các câu OMR nằm ngoài snapshot của mã đề, kể cả khi câu dư có `rawAnswer`
 - lưu đáp án vào `StudentAnswer`
 - chấm điểm bằng cùng rule của `ExamAttemptService`
 - lưu log `OmrImport` để audit/debug payload scan

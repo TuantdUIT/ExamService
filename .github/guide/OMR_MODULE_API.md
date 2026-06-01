@@ -99,6 +99,8 @@ Nhận dữ liệu OMR từ `ScoringService` -> tìm `ExamPaper` theo `examUuid 
   "paperCode": "M001",
   "studentUuid": "018f4a61-22cd-7b11-9fd2-7c5d5b5b0002",
   "externalSubmissionId": "scoring-service-omr-0001",
+  "rawImageUrl": "https://storage.example.com/omr/raw/scan-0001.jpg",
+  "scoredImageUrl": "https://storage.example.com/omr/scored/scan-0001.jpg",
   "scannedAt": "2026-05-25T10:05:00Z",
   "sections": {
     "mcq": [
@@ -159,7 +161,6 @@ Nhận dữ liệu OMR từ `ScoringService` -> tìm `ExamPaper` theo `examUuid 
 - `Exam paper not found with code: {paperCode}`
 - `OMR submission already imported: {externalSubmissionId}`
 - `Section question number must be unique in OMR section {questionType}: {sectionQuestionNumber}`
-- `Section question number does not belong to OMR section {questionType}: {sectionQuestionNumber}`
 - `Failed to serialize OMR import payload`
 - các lỗi chấm bài kế thừa từ `ExamAttemptService`
 
@@ -188,6 +189,10 @@ questionType + sectionQuestionNumber -> questionOrder nội bộ của ExamPaper
 ```
 
 `questionOrder` vẫn tồn tại trong `ExamPaper` để backend lưu snapshot theo thứ tự toàn cục, nhưng `ScoringService` không cần gửi `questionOrder` khi import OMR.
+
+Nếu `ScoringService` gửi dư câu không thuộc snapshot của mã đề, backend sẽ bỏ qua câu đó.
+
+Ví dụ đề chỉ có `MCQ` từ câu `1` đến câu `12`, nhưng `ScoringService` gửi `MCQ` từ câu `1` đến câu `40`, backend chỉ xử lý câu `1` đến câu `12` và bỏ qua câu `13` đến câu `40`, kể cả khi các câu dư có `rawAnswer`.
 
 Ví dụ:
 
@@ -267,6 +272,7 @@ Nếu `normalizedAnswer` có `M`, câu `SAQ` thực tế sẽ không khớp đá
 
 - OMR không dùng `POST /api/v1/student/exams/{examUuid}/attempts`
 - `attemptUuid` được `ExamService` tự tạo trong lúc import OMR
+- `rawImageUrl` và `scoredImageUrl` nếu có sẽ được lưu vào `ExamAttempt` để frontend xem lại ảnh scan gốc và ảnh đã chấm
 - `ExamPaper` là snapshot bản in, giúp `sectionQuestionNumber` trong từng section map chính xác về `questionUuid`
 - nếu đề có group random, random xảy ra khi tạo `ExamPaper`, không xảy ra khi import OMR
 - `OmrImport` lưu lại payload scan và attempt được tạo để phục vụ audit/debug

@@ -92,6 +92,8 @@ Ví dụ:
   "status": "IN_PROGRESS | SUBMITTED | SCORED | ANSWER_RELEASED | CANCELLED",
   "score": null,
   "isAutoSubmitted": false,
+  "rawImageUrl": "string | null",
+  "scoredImageUrl": "string | null",
   "questions": []
 }
 ```
@@ -130,7 +132,9 @@ Ví dụ:
   "timeSpentSeconds": null,
   "status": "IN_PROGRESS | SUBMITTED | SCORED | ANSWER_RELEASED | CANCELLED",
   "score": null,
-  "isAutoSubmitted": false
+  "isAutoSubmitted": false,
+  "rawImageUrl": "string | null",
+  "scoredImageUrl": "string | null"
 }
 ```
 
@@ -264,6 +268,8 @@ Học sinh bắt đầu làm bài -> lấy `studentUuid` từ claim `user.id` tr
     "status": "IN_PROGRESS",
     "score": null,
     "isAutoSubmitted": false,
+    "rawImageUrl": null,
+    "scoredImageUrl": null,
     "questions": [
       {
         "questionOrder": 1,
@@ -342,6 +348,8 @@ Trả `ResExamAttemptDTO`, ví dụ rút gọn:
     "status": "IN_PROGRESS",
     "score": null,
     "isAutoSubmitted": false,
+    "rawImageUrl": null,
+    "scoredImageUrl": null,
     "questions": [
       {
         "questionOrder": 3,
@@ -421,7 +429,9 @@ Ví dụ item summary:
   "timeSpentSeconds": null,
   "status": "IN_PROGRESS",
   "score": null,
-  "isAutoSubmitted": false
+  "isAutoSubmitted": false,
+  "rawImageUrl": null,
+  "scoredImageUrl": null
 }
 ```
 
@@ -542,6 +552,8 @@ Trả `ResExamAttemptDTO`, ví dụ rút gọn:
     "status": "SCORED",
     "score": 8.5,
     "isAutoSubmitted": false,
+    "rawImageUrl": null,
+    "scoredImageUrl": null,
     "questions": []
   }
 }
