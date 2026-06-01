@@ -7,6 +7,7 @@ Module `Exam Attempt` dùng để phục vụ luồng học sinh làm bài, bao 
 - bắt đầu làm bài
 - lấy chi tiết bài đang làm hoặc đã nộp
 - lưu đáp án trong quá trình làm bài
+- ghi nhận sự kiện giám sát/gian lận trong lúc làm bài
 - nộp bài
 - lấy danh sách các lần làm bài của học sinh
 
@@ -132,6 +133,28 @@ Ví dụ:
   "isAutoSubmitted": false
 }
 ```
+
+### 3.5. Input batch ghi nhận giám sát
+
+```json
+{
+  "events": [
+    {
+      "eventTime": "2026-06-01T10:05:12Z",
+      "eventType": "TAB_SWITCH",
+      "eventPayload": {
+        "from": "exam",
+        "to": "other_tab",
+        "visibilityState": "hidden"
+      }
+    }
+  ]
+}
+```
+
+`eventTime` có thể bỏ trống. Nếu bỏ trống, backend dùng thời điểm nhận request.
+
+`eventPayload` là JSON linh hoạt để frontend gửi thêm metadata phục vụ audit/debug.
 
 ---
 
@@ -544,6 +567,99 @@ Trả `ResExamAttemptDTO`, ví dụ rút gọn:
 
 ---
 
+## 5.6. Gửi batch ghi nhận giám sát/gian lận
+
+### Đường dẫn
+
+`POST /api/v1/student/attempts/{attemptUuid}/proctoring-events/batch`
+
+### Mô tả luồng
+
+Nhận `attemptUuid` và danh sách `events` -> kiểm tra attempt có tồn tại không -> kiểm tra attempt thuộc về học sinh hiện tại dựa trên claim `user.id` trong token -> serialize `eventPayload` thành JSON string -> lưu nhiều dòng `ExamProctoringEvent` xuống DB bằng `saveAll` -> trả số lượng event đã nhận và danh sách event đã lưu
+
+### Input format
+
+- `attemptUuid`: `UUID`
+- `events`: danh sách event, tối đa 100 event/request
+- `eventType`: một trong `TAB_SWITCH`, `FULLSCREEN_EXIT`, `WINDOW_BLUR`, `COPY_PASTE`, `NETWORK_LOST`
+- `eventTime`: thời điểm frontend ghi nhận event, có thể bỏ trống
+- `eventPayload`: JSON metadata linh hoạt, có thể bỏ trống
+
+```json
+{
+  "events": [
+    {
+      "eventTime": "2026-06-01T10:05:12Z",
+      "eventType": "TAB_SWITCH",
+      "eventPayload": {
+        "from": "exam_screen",
+        "to": "other_tab",
+        "visibilityState": "hidden"
+      }
+    },
+    {
+      "eventTime": "2026-06-01T10:07:20Z",
+      "eventType": "FULLSCREEN_EXIT",
+      "eventPayload": {
+        "fullscreen": false,
+        "reason": "escape_key"
+      }
+    }
+  ]
+}
+```
+
+### Output format
+
+```json
+{
+  "statusCode": 200,
+  "message": "Create proctoring events",
+  "data": {
+    "attemptUuid": "uuid",
+    "acceptedCount": 2,
+    "events": [
+      {
+        "eventUuid": "uuid",
+        "attemptUuid": "uuid",
+        "eventTime": "2026-06-01T10:05:12Z",
+        "eventType": "TAB_SWITCH",
+        "eventPayload": "{\"from\":\"exam_screen\",\"to\":\"other_tab\",\"visibilityState\":\"hidden\"}"
+      },
+      {
+        "eventUuid": "uuid",
+        "attemptUuid": "uuid",
+        "eventTime": "2026-06-01T10:07:20Z",
+        "eventType": "FULLSCREEN_EXIT",
+        "eventPayload": "{\"fullscreen\":false,\"reason\":\"escape_key\"}"
+      }
+    ]
+  }
+}
+```
+
+### Exception có thể trả về
+
+#### `400 Bad Request`
+
+- `Attempt not found with id: {attemptUuid}`
+- `You do not have permission to access this attempt`
+- `Current user id is required`
+- `Proctoring events must not be empty`
+- `Proctoring events batch size must not exceed 100`
+- `Proctoring event type is required`
+- `Failed to serialize proctoring event payload`
+
+#### `403 Forbidden`
+
+- khi `access token` không hợp lệ hoặc không đủ quyền truy cập
+
+#### `500 Internal Server Error`
+
+- lỗi không mong muốn từ backend
+
+---
+
 ## 6. Luồng liên quan module khác
 
 ### 6.1. Liên quan `Exam Module`
@@ -601,7 +717,15 @@ Nếu muốn chống mất dữ liệu khi mất mạng:
 - nên lưu tạm đáp án ở local
 - retry khi có mạng lại
 
-### 7.3. Convention `TFQ`
+### 7.3. Khi ghi nhận giám sát/gian lận
+
+Frontend nên gom nhiều event rồi gọi:
+
+- `POST /api/v1/student/attempts/{attemptUuid}/proctoring-events/batch`
+
+Nên gửi theo batch nhỏ, ví dụ mỗi 5-10 event hoặc mỗi vài giây, để giảm số request.
+
+### 7.4. Convention `TFQ`
 
 - đáp án học sinh nên gửi đủ 4 ký tự
 - dùng `B` cho ý bỏ trống
@@ -610,7 +734,7 @@ Ví dụ:
 
 - `DSBD`
 
-### 7.4. Convention `SAQ`
+### 7.5. Convention `SAQ`
 
 - nhập thường:
   - `12`
@@ -661,3 +785,13 @@ Frontend có thể đọc lại:
 - lấy toàn bộ attempt của học sinh
 - filter theo `examUuid`
 - kiểm tra `status`, `score`, `submittedAt`, `isAutoSubmitted`
+
+### 8.6. Ghi nhận giám sát/gian lận
+
+- gửi batch 1 event
+- gửi batch nhiều event
+- gửi `eventPayload` dạng object JSON
+- gửi thiếu `eventType`
+- gửi batch rỗng
+- gửi quá 100 event
+- gửi event cho attempt không thuộc học sinh hiện tại
