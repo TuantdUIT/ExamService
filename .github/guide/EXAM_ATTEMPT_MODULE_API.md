@@ -567,7 +567,65 @@ Trả `ResExamAttemptDTO`, ví dụ rút gọn:
 
 ---
 
-## 5.6. Gửi batch ghi nhận giám sát/gian lận
+## 5.6. Lấy danh sách ghi nhận giám sát/gian lận
+
+### Đường dẫn
+
+`GET /api/v1/student/attempts/{attemptUuid}/proctoring-events`
+
+### Mô tả luồng
+
+Nhận `attemptUuid` -> kiểm tra attempt có tồn tại không -> kiểm tra attempt thuộc về học sinh hiện tại dựa trên claim `user.id` trong token -> lấy danh sách `ExamProctoringEvent` theo `attemptUuid` và sắp xếp tăng dần theo `eventTime` -> trả kết quả
+
+### Input format
+
+- `attemptUuid`: `UUID`
+- không có body
+
+### Output format
+
+```json
+{
+  "statusCode": 200,
+  "message": "Get proctoring events",
+  "data": [
+    {
+      "eventUuid": "uuid",
+      "attemptUuid": "uuid",
+      "eventTime": "2026-06-01T10:05:12Z",
+      "eventType": "TAB_SWITCH",
+      "eventPayload": "{\"from\":\"exam_screen\",\"to\":\"other_tab\",\"visibilityState\":\"hidden\"}"
+    },
+    {
+      "eventUuid": "uuid",
+      "attemptUuid": "uuid",
+      "eventTime": "2026-06-01T10:07:20Z",
+      "eventType": "FULLSCREEN_EXIT",
+      "eventPayload": "{\"fullscreen\":false,\"reason\":\"escape_key\"}"
+    }
+  ]
+}
+```
+
+### Exception có thể trả về
+
+#### `400 Bad Request`
+
+- `Attempt not found with id: {attemptUuid}`
+- `You do not have permission to access this attempt`
+- `Current user id is required`
+
+#### `403 Forbidden`
+
+- khi `access token` không hợp lệ hoặc không đủ quyền truy cập
+
+#### `500 Internal Server Error`
+
+- lỗi không mong muốn từ backend
+
+---
+
+## 5.7. Gửi batch ghi nhận giám sát/gian lận
 
 ### Đường dẫn
 
@@ -725,6 +783,10 @@ Frontend nên gom nhiều event rồi gọi:
 
 Nên gửi theo batch nhỏ, ví dụ mỗi 5-10 event hoặc mỗi vài giây, để giảm số request.
 
+Nếu cần xem lại log giám sát của attempt, frontend có thể gọi:
+
+- `GET /api/v1/student/attempts/{attemptUuid}/proctoring-events`
+
 ### 7.4. Convention `TFQ`
 
 - đáp án học sinh nên gửi đủ 4 ký tự
@@ -788,6 +850,7 @@ Frontend có thể đọc lại:
 
 ### 8.6. Ghi nhận giám sát/gian lận
 
+- lấy danh sách event theo attempt
 - gửi batch 1 event
 - gửi batch nhiều event
 - gửi `eventPayload` dạng object JSON

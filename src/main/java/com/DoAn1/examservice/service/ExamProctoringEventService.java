@@ -31,6 +31,17 @@ public class ExamProctoringEventService {
     private final ExamProctoringEventRepository examProctoringEventRepository;
     private final ObjectMapper objectMapper;
 
+    @Transactional(readOnly = true)
+    public List<ResProctoringEventDTO> getEvents(UUID attemptUuid) {
+        ExamAttempt attempt = examAttemptRepository.findById(attemptUuid)
+                .orElseThrow(() -> new IdInvalidException("Attempt not found with id: " + attemptUuid));
+        validateAttemptOwnership(attempt);
+
+        return examProctoringEventRepository.findByAttemptUuidOrderByEventTimeAsc(attemptUuid).stream()
+                .map(this::buildResponse)
+                .toList();
+    }
+
     @Transactional
     public ResProctoringEventBatchDTO createEvents(UUID attemptUuid, ReqProctoringEventBatchDTO request) {
         ExamAttempt attempt = examAttemptRepository.findById(attemptUuid)
